@@ -7,8 +7,8 @@
 		"dev": "vite",
 		"build": "tsc -b && vite build",
 		"lint": "eslint .",
-		"preview": "npm run build && wrangler pages dev ./dist",
-		"deploy": "npm run build && wrangler pages deploy ./dist"
+		"start": "wrangler dev",
+		"preview": "npm run build && wrangler dev"
 	},
 	"dependencies": {
 		"react": "^18.3.1",

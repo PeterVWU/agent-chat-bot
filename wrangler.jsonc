@@ -1,0 +1,19 @@
+{
+  "name": "agent-chat-bot-react",
+  "main": "api/index.ts",
+	"compatibility_date": "2025-02-24",
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+	"observability": {
+		"enabled": true
+	},
+  "kv_namespaces": [
+    { "binding": "CONVERSATIONS", "id": "690a9460bf374b30afca22d8d1fd350e", "preview_id": "YOUR_PREVIEW_KV_NAMESPACE_ID_HERE" }
+  ],
+  "ai": {
+    "binding": "AI"
+  }
+}
