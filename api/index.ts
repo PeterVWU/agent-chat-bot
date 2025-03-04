@@ -1,27 +1,3 @@
-// export type Env = {
-//   OPENAI_API_KEY: string;
-//   ASSETS: {
-//     fetch: typeof fetch;
-//   };
-// };
-
-
-// export default {
-//     async fetch(request: Request, env:Env) {
-//       const url = new URL(request.url);
-//       console.log("API request", url.pathname);
-  
-//       if (url.pathname.startsWith("/api/")) {
-//         console.log("API request", url.pathname);
-//         return new Response(JSON.stringify({ name: "Cloudflare" }), {
-//           headers: { "Content-Type": "application/json" },
-//         });
-//       }
-  
-//        return env.ASSETS.fetch(request);
-//     },
-//   };
-
   import { allTools, toolExecutors,Tool } from './tools';
 
 // Define environment type
@@ -101,20 +77,8 @@ export class SimpleChatHandler {
         content: msg.content
       }));
 
-      // Using Workers AI with Llama model
-      let aiResponse;
-      
-      // Check if the last message has potential for a tool call
-      const lastUserMessage = messages[messages.length - 1].content.toLowerCase();
-      const needsTools = this.determineToolNeed(lastUserMessage);
-      
-      if (needsTools) {
-        // Call the AI model with tool capabilities
-        aiResponse = await this.processWithTools(formattedMessages);
-      } else {
-        // Standard AI call without tools
-        aiResponse = await this.processStandardQuery(formattedMessages);
-      }
+      // Process with tools for all queries - let the LLM decide whether to use tools
+      const aiResponse = await this.processWithTools(formattedMessages);
       
       // Create assistant message from response
       const assistantMessage = {
@@ -153,104 +117,103 @@ export class SimpleChatHandler {
     }
   }
   
-  // Process query using Workers AI without tools
-  private async processStandardQuery(messages: Message[]): Promise<string> {
-    try {
-      // Use the AI binding to call the Llama model
-      const result = await this.env.AI.run('@cf/meta/llama-3-8b-instruct', {
-        messages: messages
-      });
+// Process with tools using a specialized prompt since Workers AI doesn't natively support function calling
+private async processWithTools(messages: Message[]): Promise<string> {
+  // Create a special system message that instructs the model about available tools
+  const toolsDescription = allTools.map((tool:Tool) => {
+    const params = Object.entries(tool.function.parameters.properties)
+      .map(([name, prop]) => `- ${name} (${prop.type}): ${prop.description || ''}`)
+      .join('\n');
       
-      return result.response;
-    } catch (error) {
-      console.error("Workers AI request failed:", error);
-      throw error;
-    }
-  }
-  
-  // Process with tools using a specialized prompt since Workers AI doesn't natively support function calling
-  private async processWithTools(messages: Message[]): Promise<string> {
-    // Create a special system message that instructs the model about available tools
-    const toolsDescription = allTools.map((tool:Tool) => {
-      const params = Object.entries(tool.function.parameters.properties)
-        .map(([name, prop]) => `- ${name} (${prop.type}): ${prop.description || ''}`)
-        .join('\n');
-        
-      return `
+    return `
 Tool: ${tool.function.name}
 Description: ${tool.function.description}
 Parameters:
 ${params}
 Required: ${tool.function.parameters.required.join(', ') || 'None'}
-      `;
-    }).join('\n\n');
-    
-    // Build a special system message that explains how to use tools
-    const toolsSystemMessage = {
-      role: "system" as const,
-      content: `You are a helpful assistant with access to tools. When a user's request requires using a tool, respond in the following JSON format:
+    `;
+  }).join('\n\n');
+  
+  // Build a special system message that explains how to use tools
+  const toolsSystemMessage = {
+    role: "system" as const,
+    content: `You are a concise customer service assistant with access to tools. When a user's request requires using a tool, respond in the following JSON format:
 {
   "tool": "toolName",
   "parameters": {
     "param1": "value1",
     "param2": "value2"
-  },
-  "reasoning": "Brief explanation of why you're using this tool"
+  }
 }
 
 Available tools:
 ${toolsDescription}
 
-If the user's request doesn't require a tool, respond normally without using JSON format.`
-    };
+Instructions for handling order inquiries:
+1. Ask for order number first.
+2. If the user asks for order inquery other then loopup, use createSupportTicket tool to escalate the issue.
+
+Ask for email first for ticketing inquiries
+
+Keep responses brief (1-2 sentences) when no tool is needed.`
+  };
+  
+  // Add the tools system message and make the request
+  const extendedMessages = [toolsSystemMessage, ...messages];
+  
+  try {
+    // Use the AI binding to call the Llama model
+    const result = await this.env.AI.run('@hf/nousresearch/hermes-2-pro-mistral-7b', {
+      messages: extendedMessages
+    });
     
-    // Add the tools system message and make the request
-    const extendedMessages = [toolsSystemMessage, ...messages];
+    const aiResponse = result.response;
     
+    // Check if the response is a tool call (JSON format)
     try {
-      // Use the AI binding to call the Llama model
-      const result = await this.env.AI.run('@cf/meta/llama-3-8b-instruct', {
-        messages: extendedMessages
-      });
+      // Try to parse as JSON to see if it's a tool call
+      const jsonResponse = this.extractJSON(aiResponse);
       
-      const aiResponse = result.response;
-      
-      // Check if the response is a tool call (JSON format)
-      try {
-        // Try to parse as JSON to see if it's a tool call
-        const jsonResponse = this.extractJSON(aiResponse);
+      if (jsonResponse && jsonResponse.tool && jsonResponse.parameters) {
+        // It's a tool call, execute the tool
+        const toolName = jsonResponse.tool;
+        const toolParams = jsonResponse.parameters;
+        console.log("Tool call:", toolName, toolParams);
         
-        if (jsonResponse && jsonResponse.tool && jsonResponse.parameters) {
-          // It's a tool call, execute the tool
-          const toolName = jsonResponse.tool;
-          const toolParams = jsonResponse.parameters;
+        if (toolExecutors[toolName]) {
+          // Execute the tool
+          const toolResult = await toolExecutors[toolName](toolParams);
           
-          if (toolExecutors[toolName]) {
-            // Execute the tool
-            const toolResult = await toolExecutors[toolName](toolParams);
-            
-            // Format a nice response with both the tool result and reasoning
-            return `I've used the ${toolName} tool to help answer your question.
-
-${jsonResponse.reasoning || ''}
-
-Here's what I found:
-${JSON.stringify(toolResult, null, 2)}`;
-          } else {
-            return `I wanted to use the ${toolName} tool, but it's not available. Here's what I can tell you instead: ${aiResponse}`;
-          }
+          // Now pass the tool result back to the model to generate a natural response
+          const toolResultMessage = {
+            role: "system" as const,
+            content: `You previously decided to use the ${toolName} tool with parameters ${JSON.stringify(toolParams)}. 
+The tool returned the following result: ${JSON.stringify(toolResult)}. 
+Respond to the user's original request based on this information in a natural, conversational way. 
+Do not mention that you used a tool or include raw JSON in your response. Just provide the information they need in a simple readable format, keep responses brief (1-2 sentences).`
+          };
+          
+          // Call the model again with the original messages plus the tool result
+          const finalResult = await this.env.AI.run('@hf/nousresearch/hermes-2-pro-mistral-7b', {
+            messages: [...messages, toolResultMessage]
+          });
+          
+          return finalResult.response;
+        } else {
+          return `I'm sorry, but I couldn't find the information you're looking for at the moment. Could you please try rephrasing your question?`;
         }
-      } catch (error) {
-        // Not a valid JSON response, that's fine
       }
-      
-      // If we get here, it's not a tool call or JSON parsing failed, return the original response
-      return aiResponse;
     } catch (error) {
-      console.error("Workers AI request failed:", error);
-      throw error;
+      // Not a valid JSON response, that's fine
     }
+    
+    // If we get here, it's not a tool call or JSON parsing failed, return the original response
+    return aiResponse;
+  } catch (error) {
+    console.error("Workers AI request failed:", error);
+    throw error;
   }
+}
   
   // Helper function to extract JSON from a string that might contain text before/after the JSON
   private extractJSON(text: string): any {
@@ -266,19 +229,6 @@ ${JSON.stringify(toolResult, null, 2)}`;
     }
     
     return null;
-  }
-  
-  // Simple heuristic to determine if a message might need tools
-  private determineToolNeed(message: string): boolean {
-    const toolKeywords = [
-      'time', 'what time', 'current time',
-      'calculate', 'compute', 'math', 'equation',
-      'convert currency', 'exchange rate',
-      'weather', 'temperature', 'forecast',
-      'product', 'find product', 'search for'
-    ];
-    
-    return toolKeywords.some(keyword => message.includes(keyword));
   }
 
   // Generate a unique conversation ID

@@ -15,112 +15,38 @@ export interface Tool {
   export interface ToolExecutor {
     [key: string]: (args: any) => Promise<any>;
   }
-  
-  // Current time tool
-  export const getCurrentTimeTool: Tool = {
+
+  // 1. Tool to get order information from Magento
+export const getOrderInfoTool: Tool = {
     type: "function",
     function: {
-      name: "getCurrentTime",
-      description: "Get the current server time in various formats",
+      name: "getOrderInfo",
+      description: "Retrieve order details, status, tracking information, and shipping details from Magento by order number",
       parameters: {
         type: "object",
         properties: {
-          format: {
+          orderNumber: {
             type: "string",
-            enum: ["iso", "local", "unix"],
-            description: "Time format (iso, local, or unix timestamp)"
+            description: "Customer's order number (e.g., ORD-12345678)"
           }
         },
-        required: []
+        required: ["orderNumber"]
       }
     }
   };
   
-  // Math calculation tool
-  export const calculateMathTool: Tool = {
+  // 2. Tool to search for answers using RAG in a vector database built from FAQ documents
+  export const searchFaqTool: Tool = {
     type: "function",
     function: {
-      name: "calculateMath",
-      description: "Calculate a mathematical expression",
-      parameters: {
-        type: "object",
-        properties: {
-          expression: {
-            type: "string",
-            description: "The mathematical expression to calculate"
-          }
-        },
-        required: ["expression"]
-      }
-    }
-  };
-  
-  // Currency converter tool
-  export const convertCurrencyTool: Tool = {
-    type: "function",
-    function: {
-      name: "convertCurrency",
-      description: "Convert between currencies using latest exchange rates",
-      parameters: {
-        type: "object",
-        properties: {
-          amount: {
-            type: "number",
-            description: "The amount to convert"
-          },
-          from: {
-            type: "string",
-            description: "Source currency code (e.g., USD, EUR, GBP)"
-          },
-          to: {
-            type: "string",
-            description: "Target currency code (e.g., USD, EUR, GBP)"
-          }
-        },
-        required: ["amount", "from", "to"]
-      }
-    }
-  };
-  
-  // Weather search tool
-  export const searchWeatherTool: Tool = {
-    type: "function",
-    function: {
-      name: "searchWeather",
-      description: "Search for weather information for a location",
-      parameters: {
-        type: "object",
-        properties: {
-          location: {
-            type: "string",
-            description: "The location to get weather for"
-          }
-        },
-        required: ["location"]
-      }
-    }
-  };
-  
-  // Product search tool
-  export const searchProductTool: Tool = {
-    type: "function",
-    function: {
-      name: "searchProduct",
-      description: "Search for products in catalog",
+      name: "searchFaq",
+      description: "Search for answers in the knowledge base using vector search (RAG) on FAQ documents",
       parameters: {
         type: "object",
         properties: {
           query: {
             type: "string",
-            description: "Search query for products"
-          },
-          category: {
-            type: "string",
-            description: "Product category (optional)"
-          },
-          maxPrice: {
-            type: "number",
-            description: "Maximum price filter (optional)"
+            description: "Customer's question or query"
           }
         },
         required: ["query"]
@@ -128,153 +54,268 @@ export interface Tool {
     }
   };
   
-  // Tool executors
-  export const toolExecutors: ToolExecutor = {
-    getCurrentTime: async ({ format = "iso" }) => {
-      const now = new Date();
-      switch (format) {
-        case "iso":
-          return { time: now.toISOString() };
-        case "local":
-          return { time: now.toLocaleString() };
-        case "unix":
-          return { time: Math.floor(now.getTime() / 1000) };
-        default:
-          return { time: now.toISOString() };
-      }
-    },
-    
-    calculateMath: async ({ expression }: { expression: string }) => {
-      try {
-        // Simple evaluation - for production, use a safer method
-        // eslint-disable-next-line no-eval
-        const result = eval(expression);
-        return { result };
-      } catch (error) {
-        return { error: "Invalid expression" };
-      }
-    },
-    
-    convertCurrency: async ({ 
-      amount, 
-      from, 
-      to 
-    }: { 
-      amount: number;
-      from: string;
-      to: string;
-    }) => {
-      // Mock exchange rates (in a real app, you would fetch these from an API)
-      const rates: Record<string, number> = {
-        USD: 1,
-        EUR: 0.93,
-        GBP: 0.79,
-        JPY: 153.5,
-        CAD: 1.38,
-        AUD: 1.53,
-        CNY: 7.24
-      };
-      
-      const fromRate = rates[from.toUpperCase()] || 1;
-      const toRate = rates[to.toUpperCase()] || 1;
-      
-      if (!rates[from.toUpperCase()]) {
-        return { error: `Unsupported currency: ${from}` };
-      }
-      
-      if (!rates[to.toUpperCase()]) {
-        return { error: `Unsupported currency: ${to}` };
-      }
-      
-      const convertedAmount = (amount / fromRate) * toRate;
-      
-      return {
-        from: from.toUpperCase(),
-        to: to.toUpperCase(),
-        amount,
-        convertedAmount: parseFloat(convertedAmount.toFixed(2)),
-        rate: parseFloat((toRate / fromRate).toFixed(4))
-      };
-    },
-    
-    searchWeather: async ({ location }: { location: string }) => {
-      // Simulate weather API (in a real app, you would call a weather API)
-      const conditions = ["Sunny", "Partly Cloudy", "Cloudy", "Rainy", "Stormy", "Snowy"];
-      const randomCondition = conditions[Math.floor(Math.random() * conditions.length)];
-      const randomTemp = Math.floor(Math.random() * 35) + 5; // 5 to 40 degrees
-      const randomHumidity = Math.floor(Math.random() * 60) + 30; // 30% to 90%
-      const randomWind = Math.floor(Math.random() * 30); // 0 to 30 km/h
-      
-      return {
-        location,
-        current: {
-          temperature: randomTemp,
-          temperatureUnit: "celsius",
-          condition: randomCondition,
-          humidity: randomHumidity,
-          windSpeed: randomWind,
-          windUnit: "km/h",
-          lastUpdated: new Date().toISOString()
+  // 3. Tool to create support ticket in Zoho Desk
+  export const createSupportTicketTool: Tool = {
+    type: "function",
+    function: {
+      name: "createSupportTicket",
+      description: "Create a new support ticket in Zoho Desk for the customer",
+      parameters: {
+        type: "object",
+        properties: {
+          email: {
+            type: "string",
+            description: "Customer's email address"
+          },
+          subject: {
+            type: "string",
+            description: "Subject of the support ticket"
+          },
+          description: {
+            type: "string",
+            description: "Detailed description of the issue"
+          },
+          priority: {
+            type: "string",
+            enum: ["Low", "Medium", "High", "Urgent"],
+            description: "Priority level of the ticket"
+          },
+          category: {
+            type: "string",
+            enum: ["Technical Issue", "Billing", "Shipping", "Returns", "Product Information", "Other"],
+            description: "Category of the support ticket"
+          }
         },
-        forecast: [
-          { day: "Today", high: randomTemp + 2, low: randomTemp - 5, condition: randomCondition },
-          { day: "Tomorrow", high: randomTemp + Math.floor(Math.random() * 5), low: randomTemp - Math.floor(Math.random() * 7), condition: conditions[Math.floor(Math.random() * conditions.length)] }
-        ]
-      };
-    },
-    
-    searchProduct: async ({ 
-      query, 
-      category = "", 
-      maxPrice = 1000 
-    }: { 
-      query: string;
-      category?: string;
-      maxPrice?: number;
-    }) => {
-      // Mock product database
-      const products = [
-        { id: 1, name: "Laptop Pro", category: "electronics", price: 1200, rating: 4.5 },
-        { id: 2, name: "Smartphone X", category: "electronics", price: 800, rating: 4.2 },
-        { id: 3, name: "Wireless Headphones", category: "electronics", price: 150, rating: 4.3 },
-        { id: 4, name: "Running Shoes", category: "sports", price: 95, rating: 4.1 },
-        { id: 5, name: "Yoga Mat", category: "sports", price: 40, rating: 4.0 },
-        { id: 6, name: "Coffee Maker", category: "kitchen", price: 120, rating: 4.4 },
-        { id: 7, name: "Blender Pro", category: "kitchen", price: 80, rating: 3.9 },
-        { id: 8, name: "Fiction Book", category: "books", price: 15, rating: 4.7 },
-        { id: 9, name: "Desk Lamp", category: "home", price: 35, rating: 4.0 }
-      ];
-      
-      // Simple search implementation
-      let results = products.filter(product => 
-        product.name.toLowerCase().includes(query.toLowerCase()) || 
-        product.category.toLowerCase().includes(query.toLowerCase())
-      );
-      
-      // Apply category filter if provided
-      if (category) {
-        results = results.filter(product => 
-          product.category.toLowerCase() === category.toLowerCase()
-        );
+        required: ["email", "subject", "description"]
       }
-      
-      // Apply price filter
-      results = results.filter(product => product.price <= maxPrice);
-      
-      return {
-        query,
-        filters: { category, maxPrice },
-        resultCount: results.length,
-        results: results.slice(0, 5) // Return top 5 results
-      };
     }
   };
   
+
+  // Executor implementations for the customer support tools
+export const toolExecutors: ToolExecutor = {
+    getOrderInfo: async ({ orderNumber }: { orderNumber: string }) => {
+      // Mock implementation of order info retrieval
+      // In a real implementation, this would make an API call to Magento
+      
+      // Simulate different order statuses based on order number to test various scenarios
+      const lastChar = orderNumber.slice(-1);
+      const orderStatuses = {
+        "0": "Pending",
+        "1": "Processing",
+        "2": "Shipped",
+        "3": "Delivered",
+        "4": "Canceled",
+        "5": "On Hold",
+        "6": "Backordered",
+        "7": "Refunded",
+        "8": "Returned",
+        "9": "Complete"
+      };
+      
+      const status = orderStatuses[lastChar as keyof typeof orderStatuses] || "Processing";
+      
+      // Generate mock data based on order number
+      const orderInfo = {
+        orderNumber,
+        dateCreated: `2023-${(parseInt(lastChar) % 12) + 1}-${Math.floor(Math.random() * 28) + 1}`,
+        status,
+        customerInfo: {
+          name: "John Doe",
+          email: "customer@example.com"
+        },
+        items: [
+          { 
+            name: "Product A", 
+            sku: "SKU-123", 
+            price: 49.99, 
+            quantity: 1 
+          },
+          { 
+            name: "Product B", 
+            sku: "SKU-456", 
+            price: 29.99, 
+            quantity: 2 
+          }
+        ],
+        shipping: {
+          method: "Standard Shipping",
+          address: "123 Main St, Anytown, USA",
+          cost: 5.99
+        },
+        tracking: status === "Shipped" || status === "Delivered" ? {
+          carrier: "UPS",
+          trackingNumber: `1Z999AA10123456784${lastChar}`,
+          estimatedDelivery: "2023-12-15",
+          trackingUrl: `https://wwwapps.ups.com/tracking/tracking.cgi?tracknum=1Z999AA10123456784${lastChar}`
+        } : null,
+        payment: {
+          method: "Credit Card",
+          total: 115.96,
+          currency: "USD"
+        }
+      };
+      
+      return orderInfo;
+    },
+    
+    searchFaq: async ({ 
+      query, 
+      maxResults = 3 
+    }: { 
+      query: string; 
+      maxResults?: number 
+    }) => {
+      // Mock implementation of vector search
+      // In a real implementation, this would query a vector database
+      
+      // Sample FAQ entries with mock relevance scores
+      const faqEntries = [
+        {
+          question: "How do I track my order?",
+          answer: "You can track your order by logging into your account and viewing your order history, or by clicking the tracking link in your shipping confirmation email. Alternatively, provide your order number to customer support for tracking assistance.",
+          category: "Shipping"
+        },
+        {
+          question: "What is your return policy?",
+          answer: "Our return policy allows returns within 30 days of delivery for most items. Products must be in original condition with tags attached and original packaging. To initiate a return, log into your account and select the order you wish to return.",
+          category: "Returns"
+        },
+        {
+          question: "How do I reset my password?",
+          answer: "To reset your password, click the 'Forgot Password' link on the login page. Enter your email address and follow the instructions sent to your inbox. The reset link will expire after 24 hours for security reasons.",
+          category: "Account Management"
+        },
+        {
+          question: "Can I change or cancel my order?",
+          answer: "Orders can be modified or canceled within 1 hour of placement. After that, we begin processing orders for shipment and changes may not be possible. Please contact customer support immediately if you need to modify an order.",
+          category: "Orders"
+        },
+        {
+          question: "Do you ship internationally?",
+          answer: "Yes, we ship to over 50 countries worldwide. International shipping rates and delivery times vary by destination. Import duties and taxes may apply and are the responsibility of the recipient. You can view eligible countries during checkout.",
+          category: "Shipping"
+        },
+        {
+          question: "How do I contact customer support?",
+          answer: "Our customer support team is available via email at support@example.com, by phone at 1-800-123-4567 from 9am-5pm EST Monday through Friday, or via live chat on our website during business hours.",
+          category: "Support"
+        },
+        {
+          question: "What payment methods do you accept?",
+          answer: "We accept Visa, Mastercard, American Express, Discover, PayPal, and Apple Pay. All payment information is securely encrypted. We do not store your full credit card information on our servers.",
+          category: "Billing"
+        },
+        {
+          question: "How long does shipping take?",
+          answer: "Standard shipping typically takes 3-5 business days within the continental US. Expedited shipping (2-day) and overnight options are available at checkout for most locations. Order processing takes 1-2 business days before shipment.",
+          category: "Shipping"
+        },
+        {
+          question: "Do you offer gift wrapping?",
+          answer: "Yes, gift wrapping is available for $5 per item. You can select this option during checkout. We also offer gift messages at no additional charge and can omit pricing information from packing slips for gifts.",
+          category: "Orders"
+        },
+        {
+          question: "What is your warranty policy?",
+          answer: "Our products come with a standard 1-year warranty against manufacturing defects. Extended warranties are available for purchase on select items. Warranty claims require proof of purchase and may require photos of the defective item.",
+          category: "Product Information"
+        }
+      ];
+      
+      // Simple keyword matching to simulate vector search
+      // In a real implementation, this would be a proper vector similarity search
+      const keywords = query.toLowerCase().split(/\s+/);
+      
+      const results = faqEntries
+        .map(entry => {
+          // Calculate a simple relevance score based on keyword matches
+          const questionMatches = keywords.filter(keyword => 
+            entry.question.toLowerCase().includes(keyword)
+          ).length;
+          
+          const answerMatches = keywords.filter(keyword => 
+            entry.answer.toLowerCase().includes(keyword)
+          ).length;
+          
+          const categoryMatches = keywords.filter(keyword => 
+            entry.category.toLowerCase().includes(keyword)
+          ).length;
+          
+          // Weight question matches higher than answer matches
+          const relevanceScore = (questionMatches * 3) + answerMatches + (categoryMatches * 2);
+          
+          return {
+            ...entry,
+            relevanceScore
+          };
+        })
+        .filter(entry => entry.relevanceScore > 0) // Only include entries with some relevance
+        .sort((a, b) => b.relevanceScore - a.relevanceScore) // Sort by relevance (descending)
+        .slice(0, maxResults); // Limit results
+      
+      return {
+        query,
+        resultsCount: results.length,
+        results
+      };
+    },
+    
+    createSupportTicket: async ({ 
+      email, 
+      subject, 
+      description, 
+      priority = "Medium", 
+      category = "Technical Issue" 
+    }: { 
+      email: string; 
+      subject: string; 
+      description: string; 
+      priority?: "Low" | "Medium" | "High" | "Urgent"; 
+      category?: string; 
+    }) => {
+      // Mock implementation of ticket creation
+      // In a real implementation, this would call the Zoho Desk API
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return {
+          success: false,
+          error: "Invalid email format"
+        };
+      }
+      
+      // Generate a ticket ID
+      const ticketId = `TKT-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+      
+      // Simulate API response
+      const ticket = {
+        ticketId,
+        email,
+        subject,
+        description,
+        priority,
+        category,
+        status: "Open",
+        assignedTo: "Support Team",
+        createdAt: new Date().toISOString(),
+        estimatedResponseTime: priority === "Urgent" ? "1 hour" : 
+                               priority === "High" ? "4 hours" : 
+                               priority === "Medium" ? "24 hours" : "48 hours"
+      };
+      
+      return {
+        success: true,
+        message: "Support ticket created successfully",
+        ticket
+      };
+    }
+  };
+
   // Export all tools
   export const allTools: Tool[] = [
-    getCurrentTimeTool,
-    calculateMathTool,
-    convertCurrencyTool,
-    searchWeatherTool,
-    searchProductTool
+    getOrderInfoTool,
+    searchFaqTool,
+    createSupportTicketTool
   ];
