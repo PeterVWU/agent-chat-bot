@@ -3,7 +3,15 @@
 // Define environment type
 export interface Env {
   CONVERSATIONS: KVNamespace; // Cloudflare KV namespace for storing conversations
-  AI: any; // Workers AI binding
+  AI: Ai; 
+  VECTORIZE: Vectorize;
+  MAGENTO_API_URL: string;
+  MAGENTO_API_TOKEN: string;
+  ZOHO_DESK_URL: string;
+  ZOHO_ORG_ID: string;
+  ZOHO_DEPARTMENT_ID: string;
+  ZOHO_CONTACT_ID: string;
+  ZOHO_OAUTH_WORKER: any;
   ASSETS: {
         fetch: typeof fetch;
       };
@@ -78,7 +86,7 @@ export class SimpleChatHandler {
       }));
 
       // Process with tools for all queries - let the LLM decide whether to use tools
-      const aiResponse = await this.processWithTools(formattedMessages);
+      const aiResponse = await this.processWithTools(formattedMessages, this.env);
       
       // Create assistant message from response
       const assistantMessage = {
@@ -118,7 +126,7 @@ export class SimpleChatHandler {
   }
   
 // Process with tools using a specialized prompt since Workers AI doesn't natively support function calling
-private async processWithTools(messages: Message[]): Promise<string> {
+private async processWithTools(messages: Message[], env: Env): Promise<string> {
   // Create a special system message that instructs the model about available tools
   const toolsDescription = allTools.map((tool:Tool) => {
     const params = Object.entries(tool.function.parameters.properties)
@@ -182,7 +190,12 @@ Keep responses brief (1-2 sentences) when no tool is needed.`
         
         if (toolExecutors[toolName]) {
           // Execute the tool
-          const toolResult = await toolExecutors[toolName](toolParams);
+          let toolResult = null 
+          if(toolName === "createSupportTicket"){
+            toolResult = await toolExecutors['createSupportTicket']({...toolParams, messages}, env);
+          }else{
+            toolResult = await toolExecutors[toolName](toolParams, env);
+          }
           
           // Now pass the tool result back to the model to generate a natural response
           const toolResultMessage = {
