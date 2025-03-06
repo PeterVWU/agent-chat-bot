@@ -104,7 +104,7 @@ export const toolExecutors: ToolExecutor = {
     messages: Message[]
   }, env: Env) => {
     const ticket = new CSTicketModule(env);
-    ticket.createTicket(email, messages);
+    return ticket.createTicket(email, messages);
   }
 };
 

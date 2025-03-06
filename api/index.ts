@@ -200,8 +200,8 @@ Instructions for handling requests:
               role: "system" as const,
               content: `You previously decided to use the ${toolName} tool with parameters ${JSON.stringify(toolParams)}. 
 The tool returned the following result: ${JSON.stringify(toolResult)}. 
-Respond to the user's original request based on this information in a natural, conversational way. 
-Do not mention that you used a tool or include raw JSON in your response. Just provide the information they need in a simple readable format, keep responses brief (1-2 sentences).`
+Respond to the user's original request based on this information. 
+Do not mention that you used a tool or include raw JSON in your response. keep responses in 1 sentences.`
             };
 
             // Call the model again with the original messages plus the tool result
@@ -216,6 +216,7 @@ Do not mention that you used a tool or include raw JSON in your response. Just p
         }
       } catch (error) {
         // Not a valid JSON response, that's fine
+        return `I'm sorry, but I couldn't find the information you're looking for at the moment. Could you please try rephrasing your question?`;
       }
 
       // If we get here, it's not a tool call or JSON parsing failed, return the original response

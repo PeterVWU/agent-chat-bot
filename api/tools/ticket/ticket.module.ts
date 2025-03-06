@@ -1,5 +1,5 @@
 // src/modules/ticket/ticket.module.ts
-import { Message} from "../../index";
+import { Message } from "../../index";
 import { TicketModule, ZohoTicketPayload } from "./ticket.interface"
 
 export class CSTicketModule implements TicketModule {
@@ -22,7 +22,7 @@ export class CSTicketModule implements TicketModule {
         this.contactId = env.ZOHO_CONTACT_ID;
         this.zohoOauthWorker = env.ZOHO_OAUTH_WORKER;
     }
-    public async createTicket(email: string, messages: Message[]): Promise<any> {
+    public async createTicket(email: string, messages: Message[]): Promise<string> {
         try {
             console.log('messages:', messages);
             const payload = this.prepareTicketPayload(email, messages);
@@ -46,6 +46,7 @@ export class CSTicketModule implements TicketModule {
 
             const ticketData = await response.json();
             console.log('Ticket created successfully:', ticketData);
+            return "Ticket created successfully"
         } catch (error) {
             console.error('Error creating ticket:', error);
             throw new Error('Failed to create support ticket');

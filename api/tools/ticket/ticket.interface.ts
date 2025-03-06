@@ -1,7 +1,7 @@
 // src/modules/ticket.interface.ts
 import { Message } from "../../index";
 export interface TicketModule {
-    createTicket(email: string, messages: Message[]): Promise<void>;
+    createTicket(email: string, messages: Message[]): Promise<string>;
 }
 
 export interface TicketMetadata {
