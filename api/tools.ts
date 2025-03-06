@@ -1,3 +1,4 @@
+// api/tools.ts
 import {  Env, Message} from "./index";
 import { CSMagentoModule } from "./tools/magento";
 import { CSFaqModule } from "./tools/faq";
@@ -63,7 +64,7 @@ export const getOrderInfoTool: Tool = {
     type: "function",
     function: {
       name: "createSupportTicket",
-      description: "Create a new support ticket in Zoho Desk for the customer",
+      description: "Create a support ticket for the customer when customer",
       parameters: {
         type: "object",
         properties: {

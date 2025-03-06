@@ -1,4 +1,5 @@
-  import { allTools, toolExecutors,Tool } from './tools';
+// api/index.ts
+import { allTools, toolExecutors,Tool } from './tools';
 
 // Define environment type
 export interface Env {
@@ -157,13 +158,10 @@ Required: ${tool.function.parameters.required.join(', ') || 'None'}
 Available tools:
 ${toolsDescription}
 
-Instructions for handling order inquiries:
-1. Ask for order number first.
-2. If the user asks for order inquery other then loopup, use createSupportTicket tool to escalate the issue.
-
-Ask for email first for ticketing inquiries
-
-Keep responses brief (1-2 sentences) when no tool is needed.`
+Instructions for handling requests:
+1. For order inquiries, always ask for the order number first.
+2. For support requests, always ask for customer email first if no email is provided is conversation before calling the createSupportTicket tool.
+3. Keep responses brief (1-2 sentences) and conversational.`
   };
   
   // Add the tools system message and make the request
@@ -171,12 +169,12 @@ Keep responses brief (1-2 sentences) when no tool is needed.`
   
   try {
     // Use the AI binding to call the Llama model
-    const result = await this.env.AI.run('@hf/nousresearch/hermes-2-pro-mistral-7b', {
+    const result :any = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
       messages: extendedMessages
     });
     
     const aiResponse = result.response;
-    
+    console.log('airesponse:', aiResponse);
     // Check if the response is a tool call (JSON format)
     try {
       // Try to parse as JSON to see if it's a tool call
@@ -207,7 +205,7 @@ Do not mention that you used a tool or include raw JSON in your response. Just p
           };
           
           // Call the model again with the original messages plus the tool result
-          const finalResult = await this.env.AI.run('@hf/nousresearch/hermes-2-pro-mistral-7b', {
+          const finalResult:any = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
             messages: [...messages, toolResultMessage]
           });
           
