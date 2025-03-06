@@ -160,7 +160,7 @@ ${toolsDescription}
 
 Instructions for handling requests:
 1. For order inquiries, always ask for the order number first.
-2. For support requests, always ask for customer email first if no email is provided is conversation before calling the createSupportTicket tool.
+2. For support requests, always ask for customer email first.
 3. Keep responses brief (1-2 sentences) and conversational.`
     };
 
