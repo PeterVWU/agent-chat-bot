@@ -12,12 +12,10 @@ export class CSMagentoModule implements MagentoModule {
         this.baseUrl = env.MAGENTO_API_URL;
         this.apiToken = env.MAGENTO_API_TOKEN;
     }
-    public async getOrderDetails(orderNumber: string): Promise<OrderDetails | null> {
-        console.log('getOrderDetails url:', `${this.baseUrl}/rest/V1/orders/${orderNumber}`);
+    public async getOrderInfo(orderNumber: string): Promise<OrderDetails | null> {
         try {
 
             console.log(`Fetching order details for ${orderNumber}`);
-            console.log('this.apiToken', this.apiToken)
             // Use searchCriteria to find order by increment_id
             const url = `${this.baseUrl}/rest/V1/orders?searchCriteria[filterGroups][0][filters][0][field]=increment_id&` +
                 `searchCriteria[filterGroups][0][filters][0][value]=${orderNumber}&` +
@@ -36,8 +34,8 @@ export class CSMagentoModule implements MagentoModule {
                 throw new Error(`Magento API error: ${response.statusText}`);
             }
 
-            console.log('done response:');
             const data: any = await response.json();
+            console.log('done response:', data);
             let order;
             try {
 
@@ -98,14 +96,15 @@ export class CSMagentoModule implements MagentoModule {
     }
 
     private formatOrderDetails(magentoOrder: any, trackingInfo: ShipmentInfo[]): OrderDetails {
+        console.log('formatOrderDetails:', magentoOrder, trackingInfo);
         return {
             orderNumber: magentoOrder.increment_id,
             status: magentoOrder.status,
-            items: magentoOrder.items.map((item: any) => ({
-                name: item.name,
-                quantity: item.qty_ordered,
-                price: item.price
-            })),
+            // items: magentoOrder.items.map((item: any) => ({
+            //     name: item.name,
+            //     quantity: item.qty_ordered,
+            //     price: item.price
+            // })),
             shipping: {
                 method: magentoOrder.shipping_description,
                 tracking: trackingInfo.map(track => ({

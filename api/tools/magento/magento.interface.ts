@@ -1,17 +1,17 @@
 // src/modules/magento.interface.ts
 
 export interface MagentoModule {
-    getOrderDetails(orderNumber: string): Promise<OrderDetails | null>;
+    getOrderInfo(orderNumber: string): Promise<OrderDetails | null>;
 }
 
 export interface OrderDetails {
     orderNumber: string;
     status: string;
-    items: Array<{
-        name: string;
-        quantity: number;
-        price: number;
-    }>;
+    // items: Array<{
+    //     name: string;
+    //     quantity: number;
+    //     price: number;
+    // }>;
     shipping: {
         method: string;
         tracking?: {

@@ -7,8 +7,8 @@
 		"dev": "vite",
 		"build": "tsc -b && vite build",
 		"lint": "eslint .",
-		"start": "wrangler dev",
-		"preview": "npm run build && wrangler dev"
+		"start": "wrangler dev --experimental-vectorize-bind-to-prod",
+		"preview": "npm run build && wrangler dev --experimental-vectorize-bind-to-prod"
 	},
 	"dependencies": {
 		"@radix-ui/react-avatar": "^1.1.3",
