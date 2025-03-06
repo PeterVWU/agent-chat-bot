@@ -196,17 +196,16 @@ Instructions for handling requests:
             }
             console.log('toolResult:', toolResult);
             // Now pass the tool result back to the model to generate a natural response
-            const toolResultMessage = {
-              role: "system" as const,
-              content: `You previously decided to use the ${toolName} tool with parameters ${JSON.stringify(toolParams)}. 
-The tool returned the following result: ${JSON.stringify(toolResult)}. 
-Respond to the user's original request based on this information. 
-Do not mention that you used a tool or include raw JSON in your response. keep responses in 1 sentences.`
-            };
+            const toolResultPrompt = `You previously decided to use the ${toolName} tool with parameters ${JSON.stringify(toolParams)}. 
+              The tool returned the following result: ${JSON.stringify(toolResult)}. 
+              Respond to the user's original request based on this information. 
+              Do not mention that you used a tool or include raw JSON in your response. keep responses in 1 sentences.`
+              ;
 
             // Call the model again with the original messages plus the tool result
             const finalResult: any = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-              messages: [...messages, toolResultMessage]
+              messages,
+              prompt: toolResultPrompt,
             });
 
             return finalResult.response;
