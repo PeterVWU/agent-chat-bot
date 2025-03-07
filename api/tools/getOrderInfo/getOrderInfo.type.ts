@@ -1,28 +1,7 @@
 export interface OrderDetails {
     orderNumber: string;
     status: string;
-    // items: Array<{
-    //     name: string;
-    //     quantity: number;
-    //     price: number;
-    // }>;
-    shipping: {
-        method: string;
-        tracking?: {
-            number: string;
-            carrier: string;
-        }[];
-    };
-    totals: {
-        subtotal: number;
-        shipping: number;
-        tax: number;
-        total: number;
-    };
-    dates: {
-        ordered: string;
-        updated?: string;
-    };
+    tracking_numbers: string[];
 }
 
 export interface ShipmentInfo {

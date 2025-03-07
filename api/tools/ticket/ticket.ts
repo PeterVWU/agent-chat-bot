@@ -1,20 +1,20 @@
 
-import { Message ,Env} from "../../index";
+import { Message, Env } from "../../index";
 import { ZohoTicketPayload } from "./ticket.type"
 
-export function createTicketTool(env: Env){
+export function createTicketTool(env: Env) {
     return {
         name: "createSupportTicket",
-        description: "Create a support ticket for the customer when customer inquery anything other then order lookup. such as cancel, refund, update, etc.",
+        description: "Create a support ticket for the customer. For inquiry such as order cancel, refund, update, etc.",
         parameters: {
-          type: "object",
-          properties: {
-            email: {
-              type: "string",
-              description: "Customer's email address"
-            }
-          },
-          required: ["email"]
+            type: "object",
+            properties: {
+                email: {
+                    type: "string",
+                    description: "Customer's email address"
+                }
+            },
+            required: ["email"]
         },
         function: async ({ email, messages }: { email: string, messages: Message[] }) => {
             return await createTicket(email, messages, env);
@@ -22,14 +22,14 @@ export function createTicketTool(env: Env){
     }
 }
 
-async function createTicket(email: string, messages: Message[], env:Env): Promise<string> {
+async function createTicket(email: string, messages: Message[], env: Env): Promise<string> {
     const baseUrl = env.ZOHO_DESK_URL;
     const orgId = env.ZOHO_ORG_ID;
     const departmentId = env.ZOHO_DEPARTMENT_ID;
     const contactId = env.ZOHO_CONTACT_ID;
     const zohoOauthWorker = env.ZOHO_OAUTH_WORKER;
     try {
-        console.log('messages:', messages);
+        console.log('createTicket');
         const payload = prepareTicketPayload(email, messages, departmentId, contactId);
 
         // Get valid access token
@@ -58,7 +58,7 @@ async function createTicket(email: string, messages: Message[], env:Env): Promis
     }
 }
 
-function prepareTicketPayload(email: string, messages: Message[],departmentId: string, contactId: string): ZohoTicketPayload {
+function prepareTicketPayload(email: string, messages: Message[], departmentId: string, contactId: string): ZohoTicketPayload {
     const recentMessages = messages
         .map(msg => {
             const sender = msg.role === 'user' ? 'Customer' : 'Bot';

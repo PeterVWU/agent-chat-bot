@@ -21,8 +21,8 @@
     "binding": "AI"
   },
   "vars": {
-    "MAGENTO_API_URL": "https://staging.vapewholesaleusa.com",
-    "PRODUCTION_MAGENTO_API_URL": "https://vapewholesaleusa.com",
+    "STAGGING_MAGENTO_API_URL": "https://staging.vapewholesaleusa.com",
+    "MAGENTO_API_URL": "https://vapewholesaleusa.com",
     "ZOHO_DESK_URL": "https://desk.zoho.com",
     "ZOHO_ORG_ID": "729742506",
     "ZOHO_DEPARTMENT_ID": "152404000000006907",
