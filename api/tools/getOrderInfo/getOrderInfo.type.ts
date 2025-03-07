@@ -1,9 +1,3 @@
-// src/modules/magento.interface.ts
-
-export interface MagentoModule {
-    getOrderInfo(orderNumber: string): Promise<OrderDetails | null>;
-}
-
 export interface OrderDetails {
     orderNumber: string;
     status: string;

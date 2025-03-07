@@ -1,9 +1,11 @@
 // api/index.ts
-import { allTools, toolExecutors, Tool } from './tools';
+import { runWithTools } from "@cloudflare/ai-utils";
+import { getOrderInfoTool } from "./tools/getOrderInfo/getOrderInfo";
+import {  searchFAQTool} from "./tools/faq/faq";
+import {  createTicketTool} from "./tools/ticket/ticket";
 
-// Define environment type
 export interface Env {
-  CONVERSATIONS: KVNamespace; // Cloudflare KV namespace for storing conversations
+  CONVERSATIONS: KVNamespace; 
   AI: Ai;
   VECTORIZE: Vectorize;
   MAGENTO_API_URL: string;
@@ -31,14 +33,8 @@ export interface ChatRequest {
 }
 
 // Simple chat handler for Cloudflare Workers
-export class SimpleChatHandler {
-  env: Env;
 
-  constructor(env: Env) {
-    this.env = env;
-  }
-
-  async handleRequest(request: Request) {
+  async function handleRequest(request: Request, env: Env) {
     // Handle preflight CORS requests
     console.log("Request method:", request.method);
     if (request.method === "OPTIONS") {
@@ -62,13 +58,13 @@ export class SimpleChatHandler {
       const body = await request.json() as ChatRequest;
 
       // Generate or use existing conversation ID
-      const conversationId = body.conversationId || this.generateConversationId();
+      const conversationId = body.conversationId || generateConversationId();
 
       // Load existing conversation if available
       let messages = body.messages;
 
       if (body.conversationId) {
-        const existingConversation = await this.getConversation(conversationId);
+        const existingConversation = await getConversation(conversationId, env);
         if (existingConversation) {
           // Append new user message to existing conversation
           const userMessage = messages[messages.length - 1];
@@ -87,19 +83,19 @@ export class SimpleChatHandler {
       }));
 
       // Process with tools for all queries - let the LLM decide whether to use tools
-      const aiResponse = await this.processWithTools(formattedMessages, this.env);
+      const aiResponse :any = await processWithTools(formattedMessages, env);
 
       // Create assistant message from response
       const assistantMessage = {
         role: "assistant" as const,
-        content: aiResponse
+        content: aiResponse.response
       };
 
       // Update messages with the final response
       messages = [...messages, assistantMessage];
 
       // Save the conversation
-      await this.saveConversation(conversationId, messages);
+      await saveConversation(conversationId, messages,env);
 
       // Return the final response with conversation ID
       return new Response(JSON.stringify({
@@ -127,129 +123,52 @@ export class SimpleChatHandler {
   }
 
   // Process with tools using a specialized prompt since Workers AI doesn't natively support function calling
-  private async processWithTools(messages: Message[], env: Env): Promise<string> {
-    // Create a special system message that instructs the model about available tools
-    const toolsDescription = allTools.map((tool: Tool) => {
-      const params = Object.entries(tool.function.parameters.properties)
-        .map(([name, prop]) => `- ${name} (${prop.type}): ${prop.description || ''}`)
-        .join('\n');
+  async function processWithTools(messages: Message[], env: Env): Promise<AiTextGenerationOutput> {
+    const tools = [
+      getOrderInfoTool(env),
+      searchFAQTool(env),
+      createTicketTool(env)
+    ]
 
-      return `
-Tool: ${tool.function.name}
-Description: ${tool.function.description}
-Parameters:
-${params}
-Required: ${tool.function.parameters.required.join(', ') || 'None'}
-    `;
-    }).join('\n\n');
 
     // Build a special system message that explains how to use tools
     const toolsSystemMessage = {
-      role: "system" as const,
-      content: `You are a concise customer service assistant with access to tools. When a user's request requires using a tool, respond in the following JSON format:
-{
-  "tool": "toolName",
-  "parameters": {
-    "param1": "value1",
-    "param2": "value2"
-  }
-}
-
-Available tools:
-${toolsDescription}
-
-Instructions for handling requests:
-1. For order inquiries, always ask for the order number first.
-2. For support requests, always ask for customer email first.
-3. Keep responses brief (1-2 sentences) and conversational.`
+      role: "system",
+      content: `You are a concise customer service assistant with access to tools.
+      Instructions for handling requests:
+      1. For order inquiries, always ask for the order number first.
+      2. For support requests, always ask for customer email first.
+      3. Keep responses brief (1-2 sentences)`
     };
 
     // Add the tools system message and make the request
     const extendedMessages = [toolsSystemMessage, ...messages];
 
     try {
-      // Use the AI binding to call the Llama model
-      const result: any = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-        messages: extendedMessages
-      });
-
-      const aiResponse = result.response;
-      console.log('airesponse:', aiResponse);
-      // Check if the response is a tool call (JSON format)
-      try {
-        // Try to parse as JSON to see if it's a tool call
-        const jsonResponse = this.extractJSON(aiResponse);
-
-        if (jsonResponse && jsonResponse.tool && jsonResponse.parameters) {
-          // It's a tool call, execute the tool
-          const toolName = jsonResponse.tool;
-          const toolParams = jsonResponse.parameters;
-          console.log("Tool call:", toolName, toolParams);
-
-          if (toolExecutors[toolName]) {
-            // Execute the tool
-            let toolResult = null
-            if (toolName === "createSupportTicket") {
-              toolResult = await toolExecutors['createSupportTicket']({ ...toolParams, messages }, env);
-            } else {
-              toolResult = await toolExecutors[toolName](toolParams, env);
-            }
-            console.log('toolResult:', toolResult);
-            // Now pass the tool result back to the model to generate a natural response
-            const toolResultPrompt = `You previously decided to use the ${toolName} tool with parameters ${JSON.stringify(toolParams)}. 
-              The tool returned the following result: ${JSON.stringify(toolResult)}. 
-              Respond to the user's original request based on this information. 
-              Do not mention that you used a tool or include raw JSON in your response. keep responses in 1 sentences.`
-              ;
-
-            // Call the model again with the original messages plus the tool result
-            const finalResult: any = await this.env.AI.run('@cf/meta/llama-3.3-70b-instruct-fp8-fast', {
-              messages,
-              prompt: toolResultPrompt,
-            });
-
-            return finalResult.response;
-          } else {
-            return `I'm sorry, but I couldn't find the information you're looking for at the moment. Could you please try rephrasing your question?`;
-          }
+      const response = await runWithTools(
+        env.AI as any,
+        '@hf/nousresearch/hermes-2-pro-mistral-7b',
+        {
+          messages: extendedMessages,
+          tools: tools as any
         }
-      } catch (error) {
-        // Not a valid JSON response, that's fine
-        return `I'm sorry, but I couldn't find the information you're looking for at the moment. Could you please try rephrasing your question?`;
-      }
-
-      // If we get here, it's not a tool call or JSON parsing failed, return the original response
-      return aiResponse;
+      )
+      console.log('response:', response);
+      return response;
     } catch (error) {
       console.error("Workers AI request failed:", error);
       throw error;
     }
   }
 
-  // Helper function to extract JSON from a string that might contain text before/after the JSON
-  private extractJSON(text: string): any {
-    const jsonRegex = /{[\s\S]*}/;
-    const match = text.match(jsonRegex);
-
-    if (match) {
-      try {
-        return JSON.parse(match[0]);
-      } catch (e) {
-        return null;
-      }
-    }
-
-    return null;
-  }
-
   // Generate a unique conversation ID
-  private generateConversationId(): string {
+  function generateConversationId(): string {
     return `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
   // Save conversation to KV
-  private async saveConversation(conversationId: string, messages: Message[]): Promise<void> {
-    await this.env.CONVERSATIONS.put(
+  async function saveConversation(conversationId: string, messages: Message[], env:Env): Promise<void> {
+    await env.CONVERSATIONS.put(
       conversationId,
       JSON.stringify(messages),
       { expirationTtl: 60 * 60 * 24 * 30 } // Store for 30 days
@@ -257,8 +176,8 @@ Instructions for handling requests:
   }
 
   // Get conversation from KV
-  private async getConversation(conversationId: string): Promise<Message[] | null> {
-    const conversation = await this.env.CONVERSATIONS.get(conversationId);
+  async function getConversation(conversationId: string, env:Env): Promise<Message[] | null> {
+    const conversation = await env.CONVERSATIONS.get(conversationId);
     if (!conversation) return null;
 
     try {
@@ -268,7 +187,7 @@ Instructions for handling requests:
       return null;
     }
   }
-}
+
 
 export default {
   async fetch(request: Request, env: Env) {
@@ -277,11 +196,7 @@ export default {
 
     if (url.pathname.startsWith("/api")) {
 
-      // Create an instance of the chat handler
-      const chatHandler = new SimpleChatHandler(env);
-
-      // Process the request
-      return chatHandler.handleRequest(request);
+      return handleRequest(request, env);
     }
     return env.ASSETS.fetch(request);
   },
