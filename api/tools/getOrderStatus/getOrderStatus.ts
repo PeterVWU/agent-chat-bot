@@ -1,17 +1,17 @@
 // src/modules/magento/magento.module.ts
-import { OrderDetails, ShipmentInfo } from "./getOrderInfo.type"
+import { OrderDetails, ShipmentInfo } from "./getOrderStatus.type"
 import { Env } from "../../index";
 
-export function getOrderInfoTool(env: Env) {
+export function getOrderStatusTool(env: Env) {
     return {
-        name: "getOrderInfo",
-        description: "Retrieve order details, status, tracking information, and shipping details from Magento by order number",
+        name: "getOrderStatus",
+        description: "Checks order status from Magento.",
         parameters: {
             type: "object",
             properties: {
                 orderNumber: {
                     type: "string",
-                    description: "Customer's order number (e.g., 12345678)"
+                    description: "Customer's order number"
                 }
             },
             required: ["orderNumber"]
@@ -22,9 +22,14 @@ export function getOrderInfoTool(env: Env) {
     }
 }
 
-async function getOrderInfoFn(orderNumber: string, env: Env): Promise<OrderDetails | null | any> {
+async function getOrderInfoFn(orderNumber: string, env: Env): Promise<OrderDetails| string | null > {
     const baseUrl = env.MAGENTO_API_URL;
     const apiToken = env.MAGENTO_API_TOKEN;
+
+    if (!orderNumber){
+        return "I need your order number to check the status. Could you please provide it?"
+    }
+
     try {
         console.log(`Fetching order details for ${orderNumber}`);
         // Use searchCriteria to find order by increment_id

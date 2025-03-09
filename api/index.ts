@@ -1,6 +1,6 @@
 // api/index.ts
 import { runWithTools } from "@cloudflare/ai-utils";
-import { getOrderInfoTool } from "./tools/getOrderInfo/getOrderInfo";
+import { getOrderStatusTool } from "./tools/getOrderStatus/getOrderStatus";
 import { searchFAQTool } from "./tools/faq/faq";
 import { createTicketTool } from "./tools/ticket/ticket";
 
@@ -75,6 +75,7 @@ async function handleRequest(request: Request, env: Env) {
         }
       }
     }
+    console.log('messages:', messages);
 
     // Format messages for Workers AI/Llama
     const formattedMessages = messages.map(msg => ({
@@ -125,13 +126,17 @@ async function handleRequest(request: Request, env: Env) {
 // Process with tools using a specialized prompt since Workers AI doesn't natively support function calling
 async function processWithTools(messages: Message[], env: Env): Promise<AiTextGenerationOutput> {
   const tools = [
-    getOrderInfoTool(env),
+    getOrderStatusTool(env),
     searchFAQTool(env),
     createTicketTool(env)
   ]
 
 
   // Build a special system message that explains how to use tools
+  // const toolsSystemMessage = {
+  //   role: "system",
+  //   content: `You are a customer service chatbot. Use your tools to help users and be concise, keep response brief with 1 sentence or less..`
+  // };
   const toolsSystemMessage = {
     role: "system",
     content: `You are a concise customer service assistant with access to tools.

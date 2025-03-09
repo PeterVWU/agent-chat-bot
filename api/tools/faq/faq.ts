@@ -2,7 +2,7 @@ import { Env } from "../../index";
 export function searchFAQTool(env: Env) {
     return {
         name: "searchFaq",
-        description: "Retrieves answers from the FAQ database based on the user's question. Uses vector search to find the most relevant response, ensuring accurate and helpful answers to general inquiries.",
+        description: "Answers general questions using the FAQ vector database.",
         parameters: {
             type: "object",
             properties: {

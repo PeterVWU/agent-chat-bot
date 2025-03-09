@@ -1,11 +1,11 @@
 
 import { Message, Env } from "../../index";
 import { ZohoTicketPayload } from "./ticket.type"
-
+// test order number 000300639
 export function createTicketTool(env: Env) {
     return {
-        name: "createSupportTicket",
-        description: "Create a support ticket for the customer. For inquiry such as order cancel, refund, update, etc.",
+        name: "createTicket",
+        description: "Creates a ticket in Zoho Desk.",
         parameters: {
             type: "object",
             properties: {
@@ -28,6 +28,11 @@ async function createTicket(email: string, messages: Message[], env: Env): Promi
     const departmentId = env.ZOHO_DEPARTMENT_ID;
     const contactId = env.ZOHO_CONTACT_ID;
     const zohoOauthWorker = env.ZOHO_OAUTH_WORKER;
+    
+    if(!email){
+        return "I need your email address to create a ticket. Could you please provide it?"
+    }
+    
     try {
         console.log('createTicket');
         const payload = prepareTicketPayload(email, messages, departmentId, contactId);
