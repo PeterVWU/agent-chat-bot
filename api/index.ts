@@ -75,7 +75,6 @@ async function handleRequest(request: Request, env: Env) {
         }
       }
     }
-    console.log('messages:', messages);
 
     // Format messages for Workers AI/Llama
     const formattedMessages = messages.map(msg => ({
@@ -143,14 +142,15 @@ async function processWithTools(messages: Message[], env: Env): Promise<AiTextGe
       Instructions for handling requests:
       1. For order status inquiries, always ask for the order number first, and return tacking number if exist.
       2. For all other order inquiries, use the createSupportTicket tool to create ticket.
-      3. For support requests, always ask for customer email first.
+      3. For support requests, use the createSupportTicket tool, always ask for customer email first before .
       4. For FAQ queries, provide a brief answer from the search result.
       5. Keep responses brief with 1 sentence or less.`
   };
 
+  const recentMessages = messages.slice(-2);
   // Add the tools system message and make the request
-  const extendedMessages = [toolsSystemMessage, ...messages];
-
+  const extendedMessages = [toolsSystemMessage, ...recentMessages];
+  console.log('extendedMessages:', extendedMessages);
   try {
     const response = await runWithTools(
       env.AI as any,

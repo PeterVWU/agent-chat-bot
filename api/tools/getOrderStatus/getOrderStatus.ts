@@ -26,6 +26,15 @@ async function getOrderInfoFn(orderNumber: string, env: Env): Promise<OrderDetai
     const baseUrl = env.MAGENTO_API_URL;
     const apiToken = env.MAGENTO_API_TOKEN;
 
+    if(orderNumber ==="123456789"){
+        // mock data for testing
+        return {
+            orderNumber: "123456789",
+            status: "processing",
+            tracking_numbers: ["9876543210123456789"]
+        }
+    }
+
     if (!orderNumber){
         return "I need your order number to check the status. Could you please provide it?"
     }
