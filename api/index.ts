@@ -127,7 +127,7 @@ async function processWithTools(messages: Message[], env: Env): Promise<AiTextGe
   const tools = [
     getOrderStatusTool(env),
     searchFAQTool(env),
-    createTicketTool(env)
+    createTicketTool(env, messages)
   ]
 
 

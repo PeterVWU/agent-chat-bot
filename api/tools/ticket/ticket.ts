@@ -2,7 +2,7 @@
 import { Message, Env } from "../../index";
 import { ZohoTicketPayload } from "./ticket.type"
 // test order number 000300639
-export function createTicketTool(env: Env) {
+export function createTicketTool(env: Env, messages: Message[]) {
     return {
         name: "createTicket",
         description: "Creates a ticket in Zoho Desk.",
@@ -12,15 +12,11 @@ export function createTicketTool(env: Env) {
                 email: {
                     type: "string",
                     description: "Customer's email address"
-                },
-                messages: {
-                    type: "array",
-                    description: "Array of messages exchanged in the chat",
                 }
             },
             required: ["email", "messages"]
         },
-        function: async ({ email, messages }: { email: string, messages: Message[] }) => {
+        function: async ({ email }: { email: string }) => {
             return await createTicket(email, messages, env);
         }
     }
