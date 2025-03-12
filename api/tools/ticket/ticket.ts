@@ -12,9 +12,13 @@ export function createTicketTool(env: Env) {
                 email: {
                     type: "string",
                     description: "Customer's email address"
+                },
+                messages: {
+                    type: "array",
+                    description: "Array of messages exchanged in the chat",
                 }
             },
-            required: ["email"]
+            required: ["email", "messages"]
         },
         function: async ({ email, messages }: { email: string, messages: Message[] }) => {
             return await createTicket(email, messages, env);
@@ -28,13 +32,13 @@ async function createTicket(email: string, messages: Message[], env: Env): Promi
     const departmentId = env.ZOHO_DEPARTMENT_ID;
     const contactId = env.ZOHO_CONTACT_ID;
     const zohoOauthWorker = env.ZOHO_OAUTH_WORKER;
-    
-    if(!email){
+
+    if (!email) {
         return "I need your email address to create a ticket. Could you please provide it?"
     }
-    
+
     try {
-        console.log('createTicket');
+        console.log('createTicket', email, messages);
         const payload = prepareTicketPayload(email, messages, departmentId, contactId);
 
         // Get valid access token
