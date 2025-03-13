@@ -147,7 +147,7 @@ async function processWithTools(messages: Message[], env: Env): Promise<AiTextGe
       5. Keep responses brief with 1 sentence or less.`
   };
 
-  const recentMessages = messages.slice(-2);
+  const recentMessages = messages.slice(-3);
   // Add the tools system message and make the request
   const extendedMessages = [toolsSystemMessage, ...recentMessages];
   console.log('extendedMessages:', extendedMessages);
