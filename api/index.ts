@@ -132,20 +132,20 @@ async function processWithTools(messages: Message[], env: Env): Promise<AiTextGe
 
 
   // Build a special system message that explains how to use tools
-  // const toolsSystemMessage = {
-  //   role: "system",
-  //   content: `You are a customer service chatbot. Use your tools to help users and be concise, keep response brief with 1 sentence or less..`
-  // };
   const toolsSystemMessage = {
     role: "system",
-    content: `You are a concise customer service assistant with access to tools.
-      Instructions for handling requests:
-      1. For order status inquiries, use the getOrderStatus tool, always ask for the order number first.
-      2. For all other order inquiries, use the createSupportTicket tool to create ticket.
-      3. For support requests, use the createSupportTicket tool, always ask for customer email first.
-      4. For FAQ queries, provide a brief answer from the search result.
-      5. Keep responses brief with 1 sentence or less.`
+    content: `You are a customer service chatbot. Use your tools to help users and be concise, keep response brief with 1 sentence or less..`
   };
+  // const toolsSystemMessage = {
+  //   role: "system",
+  //   content: `You are a concise customer service assistant with access to tools.
+  //     Instructions for handling requests:
+  //     1. For order status inquiries, use the getOrderStatus tool, always ask for the order number first.
+  //     2. For all other order inquiries, use the createSupportTicket tool to create ticket.
+  //     3. For support requests, use the createSupportTicket tool, always ask for customer email first.
+  //     4. For FAQ queries, provide a brief answer from the search result.
+  //     5. Keep responses brief with 1 sentence or less.`
+  // };
 
   const recentMessages = messages.slice(-3);
   // Add the tools system message and make the request
