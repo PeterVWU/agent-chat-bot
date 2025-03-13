@@ -149,7 +149,7 @@ async function processWithTools(messages: Message[], env: Env): Promise<AiTextGe
 
   const recentMessages = messages.slice(-3);
   // Add the tools system message and make the request
-  const extendedMessages = [toolsSystemMessage, ...recentMessages];
+  const extendedMessages = [toolsSystemMessage, ...messages];
   console.log('extendedMessages:', extendedMessages);
   try {
     const response = await runWithTools(
