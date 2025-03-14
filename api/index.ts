@@ -1,5 +1,5 @@
 // api/index.ts
-import { GoogleGenerativeAI, FunctionDeclaration, HarmCategory, HarmBlockThreshold ,FunctionResponse,FunctionCall} from "@google/generative-ai";
+import { GoogleGenerativeAI, FunctionDeclaration, HarmCategory, HarmBlockThreshold, FunctionResponse, FunctionCall } from "@google/generative-ai";
 import { getOrderStatusTool } from "./tools/getOrderStatus/getOrderStatus";
 import { searchFAQTool } from "./tools/faq/faq";
 import { createTicketTool } from "./tools/ticket/ticket";
@@ -17,6 +17,8 @@ export interface Env {
   ZOHO_OAUTH_WORKER: any;
   GOOGLE_API_KEY: string;
   GOOGLE_MODEL: string;
+  GATEWAY_ACCOUNT_ID: string;
+  GATEWAY_NAME: string;
   ASSETS: {
     fetch: typeof fetch;
   };
@@ -137,11 +139,11 @@ async function processWithTools(messages: Message[], env: Env): Promise<string> 
     searchFAQTool(env),
     createTicketTool(env, messages)
   ];
-  
+
   // Convert to Google API format
   const googleTools = convertToGoogleTools(toolImplementations);
   console.log('Google tools:', googleTools);
-  
+
   // Initialize Google Generative AI client
   const genAI = new GoogleGenerativeAI(env.GOOGLE_API_KEY);
   const model = genAI.getGenerativeModel({
@@ -164,7 +166,7 @@ async function processWithTools(messages: Message[], env: Env): Promise<string> 
         threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
       },
     ],
-    systemInstruction:`You are a concise customer service assistant with access to tools.
+    systemInstruction: `You are a concise customer service assistant with access to tools.
       Instructions for handling requests:
       1. For order status inquiries, use the getOrderStatus tool, always ask for the order number first.
       2. For all other order inquiries, use the createTicket tool to create ticket.
@@ -174,15 +176,17 @@ async function processWithTools(messages: Message[], env: Env): Promise<string> 
     tools: [{
       functionDeclarations: googleTools
     }],
+  }, {
+    baseUrl: `https://gateway.ai.cloudflare.com/v1/${env.GATEWAY_ACCOUNT_ID}/${env.GATEWAY_NAME}/google-ai-studio`,
   });
 
 
   // Add the system message and prepare for Google's format
   // const extendedMessages = [systemMessage, ...messages];
-  
+
   // Format history messages for chat
   const formattedHistory = messages.map(msg => {
-if (msg.role === "assistant") {
+    if (msg.role === "assistant") {
       // Map "assistant" role to "model" which is what Google's API expects
       return {
         role: "model",
@@ -204,12 +208,12 @@ if (msg.role === "assistant") {
     });
 
     // Function to handle tool calls
-    const handleToolCalls = async (toolCalls: FunctionCall[]):Promise<FunctionResponse[]> => {
+    const handleToolCalls = async (toolCalls: FunctionCall[]): Promise<FunctionResponse[]> => {
       const toolResults = [];
       console.log("Tool calls:", toolCalls);
       for (const toolCall of toolCalls) {
         const { name, args } = toolCall;
-        
+
         // Find the matching tool implementation
         const tool = toolImplementations.find(t => t.name === name);
         if (tool) {
@@ -229,37 +233,37 @@ if (msg.role === "assistant") {
           }
         }
       }
-      
+
       return toolResults;
     };
 
     // Get the last user message for the request
     const lastUserMessage = messages[messages.length - 1].content;
-    
+
     // Send message and handle any tool calls
     let response = await chat.sendMessage(lastUserMessage);
     let responseText = response.response.text();
     const calls = response.response.functionCalls()
     // Check if the model wants to use tools
     if (calls && calls.length > 0) {
-      
+
       // Execute the tool calls
-      const toolResults:FunctionResponse[] = await handleToolCalls(calls);
-      
-    
+      const toolResults: FunctionResponse[] = await handleToolCalls(calls);
+
+
       console.log("toolResults:", toolResults);
-      
+
       // Use the correct method to send function response
       const messageResponse = await chat.sendMessage([
         {
           functionResponse: toolResults[0]
         }
       ]);
-      
+
       // Update the response text
       responseText = messageResponse.response.text();
     }
-    
+
     return responseText;
   } catch (error) {
     console.error("Google Generative AI request failed:", error);
