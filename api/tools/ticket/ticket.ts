@@ -14,7 +14,7 @@ export function createTicketTool(env: Env, messages: Message[]) {
                     description: "Customer's email address"
                 }
             },
-            required: ["email", "messages"]
+            required: ["email"]
         },
         function: async ({ email }: { email: string }) => {
             return await createTicket(email, messages, env);
@@ -22,7 +22,7 @@ export function createTicketTool(env: Env, messages: Message[]) {
     }
 }
 
-async function createTicket(email: string, messages: Message[], env: Env): Promise<string> {
+async function createTicket(email: string, messages: Message[], env: Env): Promise<object> {
     const baseUrl = env.ZOHO_DESK_URL;
     const orgId = env.ZOHO_ORG_ID;
     const departmentId = env.ZOHO_DEPARTMENT_ID;
@@ -30,7 +30,7 @@ async function createTicket(email: string, messages: Message[], env: Env): Promi
     const zohoOauthWorker = env.ZOHO_OAUTH_WORKER;
 
     if (!email) {
-        return "I need your email address to create a ticket. Could you please provide it?"
+        return {result: 'Email is required'};
     }
 
     try {
@@ -56,7 +56,7 @@ async function createTicket(email: string, messages: Message[], env: Env): Promi
 
         const ticketData = await response.json();
         console.log('Ticket created successfully:', ticketData);
-        return "Ticket created successfully"
+        return {result: 'Ticket created successfully'};
     } catch (error) {
         console.error('Error creating ticket:', error);
         throw new Error('Failed to create support ticket');
