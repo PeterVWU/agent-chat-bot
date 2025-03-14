@@ -1,5 +1,5 @@
 // api/index.ts
-import { runWithTools } from "@cloudflare/ai-utils";
+import { GoogleGenerativeAI, FunctionDeclaration, HarmCategory, HarmBlockThreshold ,FunctionResponse,FunctionCall} from "@google/generative-ai";
 import { getOrderStatusTool } from "./tools/getOrderStatus/getOrderStatus";
 import { searchFAQTool } from "./tools/faq/faq";
 import { createTicketTool } from "./tools/ticket/ticket";
@@ -15,6 +15,8 @@ export interface Env {
   ZOHO_DEPARTMENT_ID: string;
   ZOHO_CONTACT_ID: string;
   ZOHO_OAUTH_WORKER: any;
+  GOOGLE_API_KEY: string;
+  GOOGLE_MODEL: string;
   ASSETS: {
     fetch: typeof fetch;
   };
@@ -33,7 +35,6 @@ export interface ChatRequest {
 }
 
 // Simple chat handler for Cloudflare Workers
-
 async function handleRequest(request: Request, env: Env) {
   // Handle preflight CORS requests
   console.log("Request method:", request.method);
@@ -76,19 +77,13 @@ async function handleRequest(request: Request, env: Env) {
       }
     }
 
-    // Format messages for Workers AI/Llama
-    const formattedMessages = messages.map(msg => ({
-      role: msg.role,
-      content: msg.content
-    }));
-
     // Process with tools for all queries - let the LLM decide whether to use tools
-    const aiResponse: any = await processWithTools(formattedMessages, env);
+    const aiResponse = await processWithTools(messages, env);
 
     // Create assistant message from response
     const assistantMessage = {
       role: "assistant" as const,
-      content: aiResponse.response
+      content: aiResponse
     };
 
     // Update messages with the final response
@@ -122,49 +117,153 @@ async function handleRequest(request: Request, env: Env) {
   }
 }
 
-// Process with tools using a specialized prompt since Workers AI doesn't natively support function calling
-async function processWithTools(messages: Message[], env: Env): Promise<AiTextGenerationOutput> {
-  const tools = [
+// Convert our tools to Google Generative AI tool format
+function convertToGoogleTools(tools: any[]): FunctionDeclaration[] {
+  return tools.map(tool => {
+    return {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    };
+  });
+}
+
+// Process with tools using Google Generative AI
+async function processWithTools(messages: Message[], env: Env): Promise<string> {
+  console.log('Processing with tools');
+  // Initialize tools
+  const toolImplementations = [
     getOrderStatusTool(env),
     searchFAQTool(env),
     createTicketTool(env, messages)
-  ]
-
-
-  // Build a special system message that explains how to use tools
-  const toolsSystemMessage = {
-    role: "system",
-    content: `You are a customer service chatbot. Use your tools to help users and be concise, keep response brief with 1 sentence or less..`
-  };
-  // const toolsSystemMessage = {
-  //   role: "system",
-  //   content: `You are a concise customer service assistant with access to tools.
-  //     Instructions for handling requests:
-  //     1. For order status inquiries, use the getOrderStatus tool, always ask for the order number first.
-  //     2. For all other order inquiries, use the createSupportTicket tool to create ticket.
-  //     3. For support requests, use the createSupportTicket tool, always ask for customer email first.
-  //     4. For FAQ queries, provide a brief answer from the search result.
-  //     5. Keep responses brief with 1 sentence or less.`
-  // };
-
-  const recentMessages = messages.slice(-3);
-  // Add the tools system message and make the request
-  const extendedMessages = [toolsSystemMessage, ...messages];
-  console.log('extendedMessages:', extendedMessages);
-  try {
-    const response = await runWithTools(
-      env.AI as any,
-      '@hf/nousresearch/hermes-2-pro-mistral-7b',
+  ];
+  
+  // Convert to Google API format
+  const googleTools = convertToGoogleTools(toolImplementations);
+  console.log('Google tools:', googleTools);
+  
+  // Initialize Google Generative AI client
+  const genAI = new GoogleGenerativeAI(env.GOOGLE_API_KEY);
+  const model = genAI.getGenerativeModel({
+    model: env.GOOGLE_MODEL || "gemini-1.5-pro",
+    safetySettings: [
       {
-        messages: extendedMessages,
-        tools: tools as any
+        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+      },
+    ],
+    systemInstruction:`You are a concise customer service assistant with access to tools.
+      Instructions for handling requests:
+      1. For order status inquiries, use the getOrderStatus tool, always ask for the order number first.
+      2. For all other order inquiries, use the createTicket tool to create ticket.
+      3. For support requests, use the createTicket tool, always ask for customer email first.
+      4. For FAQ queries, provide a brief answer from the search result.
+      5. Keep responses brief with 1 sentence or less.`,
+    tools: [{
+      functionDeclarations: googleTools
+    }],
+  });
+
+
+  // Add the system message and prepare for Google's format
+  // const extendedMessages = [systemMessage, ...messages];
+  
+  // Format history messages for chat
+  const formattedHistory = messages.map(msg => {
+if (msg.role === "assistant") {
+      // Map "assistant" role to "model" which is what Google's API expects
+      return {
+        role: "model",
+        parts: [{ text: msg.content }]
+      };
+    } else {
+      // User role stays the same
+      return {
+        role: "user",
+        parts: [{ text: msg.content }]
+      };
+    }
+  });
+
+  try {
+    // Start a chat session
+    const chat = model.startChat({
+      history: [...formattedHistory.slice(1, -1)],
+    });
+
+    // Function to handle tool calls
+    const handleToolCalls = async (toolCalls: FunctionCall[]):Promise<FunctionResponse[]> => {
+      const toolResults = [];
+      console.log("Tool calls:", toolCalls);
+      for (const toolCall of toolCalls) {
+        const { name, args } = toolCall;
+        
+        // Find the matching tool implementation
+        const tool = toolImplementations.find(t => t.name === name);
+        if (tool) {
+          try {
+            // Execute the tool function with the provided arguments
+            const result = await tool.function(args as any);
+            toolResults.push({
+              name: name,
+              response: result
+            });
+          } catch (error) {
+            console.error(`Error executing tool ${name}:`, error);
+            toolResults.push({
+              name: name,
+              response: { error: error instanceof Error ? error.message : String(error) }
+            });
+          }
+        }
       }
-    )
-    console.log('response:', response);
-    return response;
+      
+      return toolResults;
+    };
+
+    // Get the last user message for the request
+    const lastUserMessage = messages[messages.length - 1].content;
+    
+    // Send message and handle any tool calls
+    let response = await chat.sendMessage(lastUserMessage);
+    let responseText = response.response.text();
+    const calls = response.response.functionCalls()
+    // Check if the model wants to use tools
+    if (calls && calls.length > 0) {
+      
+      // Execute the tool calls
+      const toolResults:FunctionResponse[] = await handleToolCalls(calls);
+      
+    
+      console.log("toolResults:", toolResults);
+      
+      // Use the correct method to send function response
+      const messageResponse = await chat.sendMessage([
+        {
+          functionResponse: toolResults[0]
+        }
+      ]);
+      
+      // Update the response text
+      responseText = messageResponse.response.text();
+    }
+    
+    return responseText;
   } catch (error) {
-    console.error("Workers AI request failed:", error);
-    throw error;
+    console.error("Google Generative AI request failed:", error);
+    return "I'm sorry, I encountered a problem while processing your request. Please try again.";
   }
 }
 
@@ -195,14 +294,12 @@ async function getConversation(conversationId: string, env: Env): Promise<Messag
   }
 }
 
-
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
     console.log("API request", url.pathname);
 
     if (url.pathname.startsWith("/api")) {
-
       return handleRequest(request, env);
     }
     return env.ASSETS.fetch(request);

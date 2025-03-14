@@ -22,7 +22,7 @@ export function getOrderStatusTool(env: Env) {
     }
 }
 
-async function getOrderInfoFn(orderNumber: string, env: Env): Promise<OrderDetails| string | null > {
+async function getOrderInfoFn(orderNumber: string, env: Env): Promise<OrderDetails> {
     const baseUrl = env.MAGENTO_API_URL;
     const apiToken = env.MAGENTO_API_TOKEN;
 
@@ -36,7 +36,10 @@ async function getOrderInfoFn(orderNumber: string, env: Env): Promise<OrderDetai
     }
 
     if (!orderNumber){
-        return "I need your order number to check the status. Could you please provide it?"
+        return {
+            orderNumber: "",
+            status: "",
+            tracking_numbers: []}
     }
 
     try {
@@ -65,7 +68,11 @@ async function getOrderInfoFn(orderNumber: string, env: Env): Promise<OrderDetai
             // Since we're using searchCriteria, we need to check the items array
             if (!data.items || data.items.length === 0) {
                 console.log('No order found with the given increment_id');
-                return null;
+                
+                return {
+                    orderNumber: "",
+                    status: "",
+                    tracking_numbers: []}
             }
 
             // Use the first matching order

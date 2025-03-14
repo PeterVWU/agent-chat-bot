@@ -19,7 +19,7 @@ export function searchFAQTool(env: Env) {
     }
 }
 
-async function searchFAQ(query: string, env: Env): Promise<string | null> {
+async function searchFAQ(query: string, env: Env): Promise<object> {
 
     try {
         const embedding = await generateEmbedding(query, env);
@@ -33,7 +33,7 @@ async function searchFAQ(query: string, env: Env): Promise<string | null> {
             console.log('match', match)
         })
         if (!searchResults.matches.length) {
-            return null;
+            return {result:''};
         }
 
         const bestMatch = searchResults.matches[0];
@@ -44,11 +44,11 @@ async function searchFAQ(query: string, env: Env): Promise<string | null> {
         console.log('bestmatch', bestMatch.score)
         console.log("metadata.answer", metadata.answer)
 
-        return bestMatch.score > 0.7 ? metadata.answer : null;
+        return bestMatch.score > 0.7 ? {result: metadata.answer} : {result:''};
 
     } catch (error) {
         console.error('Error searching FAQs:', error);
-        return null;
+        return {result:''};
     }
 }
 
