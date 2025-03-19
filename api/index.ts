@@ -147,7 +147,7 @@ async function processWithTools(messages: Message[], env: Env): Promise<string> 
   // Initialize Google Generative AI client
   const genAI = new GoogleGenerativeAI(env.GOOGLE_API_KEY);
   const model = genAI.getGenerativeModel({
-    model: env.GOOGLE_MODEL || "gemini-1.5-pro",
+    model: env.GOOGLE_MODEL || "gemini-2.0-flash-lite",
     safetySettings: [
       {
         category: HarmCategory.HARM_CATEGORY_HARASSMENT,
