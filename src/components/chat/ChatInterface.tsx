@@ -13,7 +13,7 @@ const ChatInterface = () => {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: "👋 Hi there! I'm your customer service assistant. How can I help you today?"
+            content: "👋 Hi there! I'm your customer service assistant. How can I help you ?"
         }]);
     const [newMessage, setNewMessage] = useState('');
     const [conversationId, setConversationId] = useState<string | undefined>();
