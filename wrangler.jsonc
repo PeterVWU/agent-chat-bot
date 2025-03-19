@@ -26,7 +26,8 @@
     "ZOHO_DESK_URL": "https://desk.zoho.com",
     "ZOHO_ORG_ID": "729742506",
     "ZOHO_DEPARTMENT_ID": "152404000000006907",
-    "ZOHO_CONTACT_ID": "152404000058553001"
+    "ZOHO_CONTACT_ID": "152404000058553001",
+    "GOOGLE_MODEL": "gemini-2.0-flash-lite"
   },
   "vectorize": [
     {
