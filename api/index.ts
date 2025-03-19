@@ -301,7 +301,7 @@ async function getConversation(conversationId: string, env: Env): Promise<Messag
 export default {
   async fetch(request: Request, env: Env) {
     const url = new URL(request.url);
-    console.log("API request", url.pathname);
+    console.log("request url", url.pathname);
 
     if (url.pathname.startsWith("/api")) {
       return handleRequest(request, env);
