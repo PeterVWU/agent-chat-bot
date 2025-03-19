@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "vwu-agent-chat-bot",
   "main": "api/index.ts",
-  "compatibility_date": "2025-02-24",
+  "compatibility_date": "2025-03-19",
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
