@@ -28,7 +28,9 @@
     "ZOHO_ORG_ID": "729742506",
     "ZOHO_DEPARTMENT_ID": "152404000000006907",
     "ZOHO_CONTACT_ID": "152404000058553001",
-    "GOOGLE_MODEL": "gemini-2.0-flash-lite"
+    "GOOGLE_VERTEX_PROJECT": "vapewholesaleusa",
+    "GOOGLE_VERTEX_LOCATION": "us-central1",
+    "GOOGLE_MODEL": "gemini-2.5-flash-lite"
   },
   "vectorize": [
     {

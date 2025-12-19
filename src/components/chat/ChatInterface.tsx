@@ -18,14 +18,14 @@ const ChatInterface = () => {
     const [newMessage, setNewMessage] = useState('');
     const [conversationId, setConversationId] = useState<string | undefined>();
 
-    const sendMessage = async (): Promise<ChatResponse> => {
+    const sendMessage = async (messagesToSend: Message[]): Promise<ChatResponse> => {
         const response = await fetch('/api', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                messages,
+                messages: messagesToSend,
                 conversationId,
             }),
         });
@@ -57,12 +57,17 @@ const ChatInterface = () => {
         e.preventDefault();
         if (!newMessage.trim()) return;
 
-        setMessages(prev => [...prev, {
+        const userMessage: Message = {
             role: 'user',
             content: newMessage
-        }]);
+        };
 
-        mutation.mutate();
+        // Update local state immediately
+        setMessages(prev => [...prev, userMessage]);
+
+        // Send the updated messages array to the API
+        const updatedMessages = [...messages, userMessage];
+        mutation.mutate(updatedMessages);
     };
 
     const handleActionClick = (type: string, value: string) => {
@@ -77,8 +82,19 @@ const ChatInterface = () => {
                 ? "TICKET_CREATE"
                 : "";
         }
-        setNewMessage(message)
-        mutation.mutate();
+
+        const userMessage: Message = {
+            role: 'user',
+            content: message
+        };
+
+        // Update local state immediately
+        setMessages(prev => [...prev, userMessage]);
+        setNewMessage('');
+
+        // Send the updated messages array to the API
+        const updatedMessages = [...messages, userMessage];
+        mutation.mutate(updatedMessages);
     }
 
     return (

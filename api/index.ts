@@ -1,5 +1,5 @@
 // api/index.ts
-import { GoogleGenerativeAI, FunctionDeclaration, HarmCategory, HarmBlockThreshold, FunctionResponse, FunctionCall } from "@google/generative-ai";
+import { generateContent, extractText, extractFunctionCalls, type FunctionDeclaration, type FunctionCall, type FunctionResponse } from './vertexRestApi';
 import { getOrderStatusTool } from "./tools/getOrderStatus/getOrderStatus";
 import { searchFAQTool } from "./tools/faq/faq";
 import { createTicketTool } from "./tools/ticket/ticket";
@@ -15,10 +15,10 @@ export interface Env {
   ZOHO_DEPARTMENT_ID: string;
   ZOHO_CONTACT_ID: string;
   ZOHO_OAUTH_WORKER: any;
-  GOOGLE_API_KEY: string;
+  GOOGLE_SERVICE_ACCOUNT_JSON: string;
+  GOOGLE_VERTEX_PROJECT: string;
+  GOOGLE_VERTEX_LOCATION: string;
   GOOGLE_MODEL: string;
-  GATEWAY_ACCOUNT_ID: string;
-  GATEWAY_NAME: string;
   ASSETS: {
     fetch: typeof fetch;
   };
@@ -144,69 +144,35 @@ async function processWithTools(messages: Message[], env: Env): Promise<string> 
   const googleTools = convertToGoogleTools(toolImplementations);
   console.log('Google tools:', googleTools);
 
-  // Initialize Google Generative AI client
-  const genAI = new GoogleGenerativeAI(env.GOOGLE_API_KEY);
-  const model = genAI.getGenerativeModel({
-    model: env.GOOGLE_MODEL || "gemini-2.0-flash-lite",
-    safetySettings: [
-      {
-        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-      },
-      {
-        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-      },
-      {
-        category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-      },
-      {
-        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-        threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-      },
-    ],
-    systemInstruction: `You are a concise customer service assistant with access to tools.
+  // System instruction
+  const systemInstruction = {
+    role: 'system',
+    parts: [{
+      text: `You are a concise customer service assistant with access to tools.
       Instructions for handling requests:
       1. For order status inquiries, use the getOrderStatus tool, always ask for the order number first.
       2. For all other order inquiries, use the createTicket tool to create ticket.
       3. For support requests, use the createTicket tool, always ask for customer email first.
       4. For FAQ queries, provide a brief answer from the search result.
-      5. Keep responses brief with 1 sentence or less.`,
-    tools: [{
-      functionDeclarations: googleTools
-    }],
-  }, {
-    baseUrl: `https://gateway.ai.cloudflare.com/v1/${env.GATEWAY_ACCOUNT_ID}/${env.GATEWAY_NAME}/google-ai-studio`,
-  });
+      5. Keep responses brief with 1 sentence or less.`
+    }]
+  };
 
+  // Safety settings
+  const safetySettings = [
+    { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+    { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+    { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+    { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+  ];
 
-  // Add the system message and prepare for Google's format
-  // const extendedMessages = [systemMessage, ...messages];
-
-  // Format history messages for chat
-  const formattedHistory = messages.map(msg => {
-    if (msg.role === "assistant") {
-      // Map "assistant" role to "model" which is what Google's API expects
-      return {
-        role: "model",
-        parts: [{ text: msg.content }]
-      };
-    } else {
-      // User role stays the same
-      return {
-        role: "user",
-        parts: [{ text: msg.content }]
-      };
-    }
-  });
+  // Format conversation history for Vertex AI
+  const contents = messages.map(msg => ({
+    role: msg.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: msg.content }]
+  }));
 
   try {
-    // Start a chat session
-    const chat = model.startChat({
-      history: [...formattedHistory.slice(1, -1)],
-    });
-
     // Function to handle tool calls
     const handleToolCalls = async (toolCalls: FunctionCall[]): Promise<FunctionResponse[]> => {
       const toolResults = [];
@@ -237,31 +203,46 @@ async function processWithTools(messages: Message[], env: Env): Promise<string> 
       return toolResults;
     };
 
-    // Get the last user message for the request
-    const lastUserMessage = messages[messages.length - 1].content;
+    // First API call with user's message
+    let response = await generateContent(env, {
+      contents,
+      systemInstruction,
+      safetySettings,
+      tools: [{ functionDeclarations: googleTools }],
+    });
 
-    // Send message and handle any tool calls
-    let response = await chat.sendMessage(lastUserMessage);
-    let responseText = response.response.text();
-    const calls = response.response.functionCalls()
-    // Check if the model wants to use tools
-    if (calls && calls.length > 0) {
+    // Extract text and function calls
+    let responseText = extractText(response);
+    const functionCalls = extractFunctionCalls(response);
 
+    // If there are function calls, execute them and get final response
+    if (functionCalls.length > 0) {
       // Execute the tool calls
-      const toolResults: FunctionResponse[] = await handleToolCalls(calls);
-
-
+      const toolResults = await handleToolCalls(functionCalls);
       console.log("toolResults:", toolResults);
 
-      // Use the correct method to send function response
-      const messageResponse = await chat.sendMessage([
+      // Add function call and response to conversation
+      const updatedContents = [
+        ...contents,
         {
-          functionResponse: toolResults[0]
+          role: 'model',
+          parts: functionCalls.map(fc => ({ functionCall: fc }))
+        },
+        {
+          role: 'user',
+          parts: toolResults.map(result => ({ functionResponse: result }))
         }
-      ]);
+      ];
 
-      // Update the response text
-      responseText = messageResponse.response.text();
+      // Get final response from model
+      const finalResponse = await generateContent(env, {
+        contents: updatedContents,
+        systemInstruction,
+        safetySettings,
+        tools: [{ functionDeclarations: googleTools }],
+      });
+
+      responseText = extractText(finalResponse);
     }
 
     return responseText;
